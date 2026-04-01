@@ -232,30 +232,45 @@
   </div>
 
   <script>
-    // 获取实时金价 - 使用 CORS 代理
+    // 获取实时金价 - 使用多个 CORS 代理
     async function fetchGoldPrice() {
       console.log('🔄 开始获取金价...');
       
-      // 使用 CORS 代理访问新浪财经
-      try {
-        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://hq.sinajs.cn/?list=HF_XAUUSD');
-        const response = await fetch(proxyUrl);
-        const text = await response.text();
-        console.log('📦 返回:', text);
-        
-        const match = text.match(/"([^"]+)"/);
-        if (match && match[1]) {
-          const parts = match[1].split(',');
-          const current = parseFloat(parts[0]);
-          const open = parseFloat(parts[1]) || current;
-          if (current > 0) {
-            const change = ((current - open) / open * 100);
-            console.log('✅ 金价:', current, '涨跌:', change.toFixed(2) + '%');
-            return { price: current, change: change };
+      const apiUrl = 'https://hq.sinajs.cn/?list=HF_XAUUSD';
+      
+      // 尝试多个代理
+      const proxies = [
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?',
+        'https://cors-anywhere.herokuapp.com/'
+      ];
+      
+      for (const proxy of proxies) {
+        try {
+          console.log('尝试代理:', proxy);
+          const proxyUrl = proxy + encodeURIComponent(apiUrl);
+          const response = await fetch(proxyUrl, {
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+          const text = await response.text();
+          console.log('📦 返回:', text);
+          
+          const match = text.match(/"([^"]+)"/);
+          if (match && match[1]) {
+            const parts = match[1].split(',');
+            const current = parseFloat(parts[0]);
+            const open = parseFloat(parts[1]) || current;
+            if (current > 0 && current > 1000) { // 验证数据合理性
+              const change = ((current - open) / open * 100);
+              console.log('✅ 金价:', current, '涨跌:', change.toFixed(2) + '%');
+              return { price: current, change: change };
+            }
           }
+        } catch (e) {
+          console.log('❌ 代理失败:', proxy, e.message);
         }
-      } catch (e) {
-        console.log('❌ API 失败:', e.message);
       }
       
       // 备用数据
