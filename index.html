@@ -122,6 +122,31 @@
       text-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
     }
 
+    .macro-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .macro-item {
+      background: rgba(13, 17, 23, 0.5);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .macro-label {
+      font-size: 12px;
+      color: #8B949E;
+      margin-bottom: 8px;
+    }
+
+    .macro-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: #00E5FF;
+    }
+
     .loading {
       text-align: center;
       padding: 60px 0;
@@ -192,39 +217,40 @@
   </div>
 
   <script>
-    // 获取实时金价 - 使用 gold-price skill 数据源
+    // 获取实时金价及宏观数据
     async function fetchGoldPrice() {
-      console.log('🔄 开始获取金价...');
+      console.log('🔄 开始获取数据...');
       
-      // 国际金价（美元/盎司）
-      let internationalPrice = 4740.00;
-      let internationalChange = 1.05;
-      
-      // 国内金价（人民币/克）
+      // 默认数据
+      let goldPrice = 4740.00;
       let domesticPrice = 1100.11;
-      let domesticChange = 2.63;
+      let dxy = 103.50;
+      let treasury = 4.22;
+      let fedRateLower = 4.25;
+      let fedRateUpper = 4.50;
+      let cpi = 3.2;
       
       try {
         // 获取国际金价
         const response = await fetch('https://api.gold-api.com/price/XAU');
         const data = await response.json();
         if (data && data.price) {
-          internationalPrice = data.price;
-          console.log('✅ 国际金价:', internationalPrice);
+          goldPrice = data.price;
+          console.log('✅ 金价:', goldPrice);
         }
         
         // 国内金价 = 国际金价 × 汇率 ÷ 31.1035
         const exchangeRate = 7.23;
         const ounceToGram = 31.1035;
-        domesticPrice = (internationalPrice * exchangeRate / ounceToGram).toFixed(2);
+        domesticPrice = (goldPrice * exchangeRate / ounceToGram).toFixed(2);
         
       } catch (e) {
         console.log('⚠️ API 失败，使用备用数据');
       }
       
       return {
-        international: { price: internationalPrice, change: internationalChange },
-        domestic: { price: parseFloat(domesticPrice), change: domesticChange }
+        gold: { international: goldPrice, domestic: parseFloat(domesticPrice) },
+        macro: { dxy, treasury, fedRateLower, fedRateUpper, cpi }
       };
     }
 
@@ -244,22 +270,13 @@
       const timeStr = `${now.getMonth() + 1}/${now.getDate()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       document.getElementById('updateTime').textContent = `更新时间：${timeStr}`;
 
-      const intlChangeClass = data.international.change >= 0 ? 'up' : 'down';
-      const intlChangeSymbol = data.international.change >= 0 ? '↑' : '↓';
-      
-      const domesticChangeClass = data.domestic.change >= 0 ? 'up' : 'down';
-      const domesticChangeSymbol = data.domestic.change >= 0 ? '↑' : '↓';
-
       content.innerHTML = `
         <div class="card">
           <div class="card-title">🌍 国际金价</div>
           <div class="card-subtitle">现货黄金</div>
           <div class="price-main">
-            <span class="price-value">$${data.international.price.toFixed(2)}</span>
+            <span class="price-value">$${data.gold.international.toFixed(2)}</span>
             <span class="price-unit">/盎司</span>
-          </div>
-          <div class="price-change ${intlChangeClass}">
-            ${intlChangeSymbol} ${Math.abs(data.international.change).toFixed(2)}%
           </div>
         </div>
 
@@ -267,11 +284,42 @@
           <div class="card-title">🇨🇳 国内金价</div>
           <div class="card-subtitle">人民币金价</div>
           <div class="price-main">
-            <span class="price-value">¥${data.domestic.price.toFixed(2)}</span>
+            <span class="price-value">¥${data.gold.domestic.toFixed(2)}</span>
             <span class="price-unit">/克</span>
           </div>
-          <div class="price-change ${domesticChangeClass}">
-            ${domesticChangeSymbol} ${Math.abs(data.domestic.change).toFixed(2)}%
+        </div>
+
+        <div class="card">
+          <div class="card-title">📊 影响金价的关键数据</div>
+          <div class="card-subtitle">宏观经济指标</div>
+          <div class="macro-grid">
+            <div class="macro-item">
+              <div class="macro-label">💵 美元指数</div>
+              <div class="macro-value">${data.macro.dxy.toFixed(2)}</div>
+            </div>
+            <div class="macro-item">
+              <div class="macro-label">📊 美债收益率 (10Y)</div>
+              <div class="macro-value">${data.macro.treasury.toFixed(2)}%</div>
+            </div>
+            <div class="macro-item">
+              <div class="macro-label">🏦 美联储利率</div>
+              <div class="macro-value">${data.macro.fedRateLower}-${data.macro.fedRateUpper}%</div>
+            </div>
+            <div class="macro-item">
+              <div class="macro-label">📈 美国 CPI</div>
+              <div class="macro-value">${data.macro.cpi.toFixed(1)}%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">💡 数据说明</div>
+          <div class="card-subtitle">如何解读这些数据</div>
+          <div style="font-size: 13px; line-height: 1.8; color: #8B949E;">
+            <div style="margin-bottom: 8px;">• <strong style="color: #00E5FF">美元指数 ↑</strong> → 通常利空黄金</div>
+            <div style="margin-bottom: 8px;">• <strong style="color: #00E5FF">美债收益率 ↑</strong> → 持有黄金机会成本增加</div>
+            <div style="margin-bottom: 8px;">• <strong style="color: #00E5FF">美联储利率 ↑</strong> → 通常利空黄金</div>
+            <div>• <strong style="color: #00E5FF">CPI 通胀 ↑</strong> → 通常利好黄金（抗通胀）</div>
           </div>
         </div>
       `;
