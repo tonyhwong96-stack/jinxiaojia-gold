@@ -122,46 +122,6 @@
       text-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
     }
 
-    .price-list {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .price-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .price-item:last-child {
-      border-bottom: none;
-    }
-
-    .price-brand {
-      font-size: 16px;
-      font-weight: 500;
-      color: #E6EDF3;
-    }
-
-    .price-info {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-
-    .price-num {
-      font-size: 18px;
-      font-weight: 700;
-      color: #FFD700;
-    }
-
-    .price-change-small {
-      font-size: 12px;
-      margin-top: 4px;
-    }
-
     .loading {
       text-align: center;
       padding: 60px 0;
@@ -232,78 +192,39 @@
   </div>
 
   <script>
-    // 获取实时金价 - 分别获取国际和国内价格
+    // 获取实时金价 - 使用 gold-price skill 数据源
     async function fetchGoldPrice() {
       console.log('🔄 开始获取金价...');
       
-      // 1. 国际金价（美元/盎司）
-      const internationalApi = 'https://hq.sinajs.cn/?list=HF_XAUUSD';
-      let internationalPrice = 4716.04;
+      // 国际金价（美元/盎司）
+      let internationalPrice = 4740.00;
       let internationalChange = 1.05;
       
-      // 2. 上海黄金交易所 Au99.99（人民币/克）- 使用黄金 ETF 518880
-      const sgeApi = 'https://hq.sinajs.cn/?list=s_sh518880';
-      let sgePrice = 1045.70;
-      let sgeChange = 2.63;
+      // 国内金价（人民币/克）
+      let domesticPrice = 1100.11;
+      let domesticChange = 2.63;
       
-      // 使用 skill 获取的数据（2026-04-01 15:42）
-      // 国际金价：$4732.70/盎司
-      // 国内金价：¥1100.11/克
-      
-      const proxies = [
-        'https://api.allorigins.win/raw?url=',
-        'https://corsproxy.io/?'
-      ];
-      
-      // 尝试获取国际金价
-      for (const proxy of proxies) {
-        try {
-          const proxyUrl = proxy + encodeURIComponent(internationalApi);
-          const response = await fetch(proxyUrl);
-          const text = await response.text();
-          const match = text.match(/"([^"]+)"/);
-          if (match && match[1]) {
-            const parts = match[1].split(',');
-            const current = parseFloat(parts[0]);
-            const open = parseFloat(parts[1]) || current;
-            if (current > 0 && current > 1000) {
-              internationalPrice = current;
-              internationalChange = ((current - open) / open * 100);
-              console.log('✅ 国际金价:', internationalPrice, '涨跌:', internationalChange.toFixed(2) + '%');
-              break;
-            }
-          }
-        } catch (e) {
-          console.log('❌ 国际金价获取失败');
+      try {
+        // 获取国际金价
+        const response = await fetch('https://api.gold-api.com/price/XAU');
+        const data = await response.json();
+        if (data && data.price) {
+          internationalPrice = data.price;
+          console.log('✅ 国际金价:', internationalPrice);
         }
-      }
-      
-      // 尝试获取上海金价
-      for (const proxy of proxies) {
-        try {
-          const proxyUrl = proxy + encodeURIComponent(sgeApi);
-          const response = await fetch(proxyUrl);
-          const text = await response.text();
-          const match = text.match(/"([^"]+)"/);
-          if (match && match[1]) {
-            const parts = match[1].split(',');
-            const current = parseFloat(parts[3] || parts[0]);
-            const open = parseFloat(parts[1]) || current;
-            if (current > 0 && current > 100) {
-              sgePrice = current;
-              sgeChange = ((current - open) / open * 100);
-              console.log('✅ 上海金价:', sgePrice, '涨跌:', sgeChange.toFixed(2) + '%');
-              break;
-            }
-          }
-        } catch (e) {
-          console.log('❌ 上海金价获取失败');
-        }
+        
+        // 国内金价 = 国际金价 × 汇率 ÷ 31.1035
+        const exchangeRate = 7.23;
+        const ounceToGram = 31.1035;
+        domesticPrice = (internationalPrice * exchangeRate / ounceToGram).toFixed(2);
+        
+      } catch (e) {
+        console.log('⚠️ API 失败，使用备用数据');
       }
       
       return {
         international: { price: internationalPrice, change: internationalChange },
-        sge: { price: sgePrice, change: sgeChange }
+        domestic: { price: parseFloat(domesticPrice), change: domesticChange }
       };
     }
 
@@ -326,8 +247,8 @@
       const intlChangeClass = data.international.change >= 0 ? 'up' : 'down';
       const intlChangeSymbol = data.international.change >= 0 ? '↑' : '↓';
       
-      const sgeChangeClass = data.sge.change >= 0 ? 'up' : 'down';
-      const sgeChangeSymbol = data.sge.change >= 0 ? '↑' : '↓';
+      const domesticChangeClass = data.domestic.change >= 0 ? 'up' : 'down';
+      const domesticChangeSymbol = data.domestic.change >= 0 ? '↑' : '↓';
 
       content.innerHTML = `
         <div class="card">
@@ -344,55 +265,13 @@
 
         <div class="card">
           <div class="card-title">🇨🇳 国内金价</div>
-          <div class="card-subtitle">上海黄金交易所 Au99.99</div>
+          <div class="card-subtitle">人民币金价</div>
           <div class="price-main">
-            <span class="price-value">¥${data.sge.price.toFixed(2)}</span>
+            <span class="price-value">¥${data.domestic.price.toFixed(2)}</span>
             <span class="price-unit">/克</span>
           </div>
-          <div class="price-change ${sgeChangeClass}">
-            ${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(2)}%
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">📊 品牌金价</div>
-          <div class="card-subtitle">国内主流品牌</div>
-          <div class="price-list">
-            <div class="price-item">
-              <span class="price-brand">周大福</span>
-              <div class="price-info">
-                <span class="price-num">¥${(data.sge.price + 15).toFixed(0)}/克</span>
-                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
-              </div>
-            </div>
-            <div class="price-item">
-              <span class="price-brand">老凤祥</span>
-              <div class="price-info">
-                <span class="price-num">¥${(data.sge.price + 12).toFixed(0)}/克</span>
-                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
-              </div>
-            </div>
-            <div class="price-item">
-              <span class="price-brand">周生生</span>
-              <div class="price-info">
-                <span class="price-num">¥${(data.sge.price + 18).toFixed(0)}/克</span>
-                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
-              </div>
-            </div>
-            <div class="price-item">
-              <span class="price-brand">六福</span>
-              <div class="price-info">
-                <span class="price-num">¥${(data.sge.price + 14).toFixed(0)}/克</span>
-                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
-              </div>
-            </div>
-            <div class="price-item">
-              <span class="price-brand">中国黄金</span>
-              <div class="price-info">
-                <span class="price-num">¥${(data.sge.price + 8).toFixed(0)}/克</span>
-                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
-              </div>
-            </div>
+          <div class="price-change ${domesticChangeClass}">
+            ${domesticChangeSymbol} ${Math.abs(data.domestic.change).toFixed(2)}%
           </div>
         </div>
       `;
