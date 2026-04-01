@@ -232,28 +232,34 @@
   </div>
 
   <script>
-    // 当前金价（2026-04-01）
-    let currentGoldPrice = 4686.00;
-    let currentChange = 1.25;
-
-    // 获取实时金价
+    // 获取实时金价 - 使用多个 API 源
     async function fetchGoldPrice() {
+      console.log('🔄 开始获取金价...');
+      
+      // 方案 1：新浪财经 API
       try {
-        // 尝试调用金十数据 API
-        const response = await fetch('https://data-api.jin10.com/datacenter/flash?category=fx&channel=-1&vip=0&token=2b430a92c7a0c95bc5040f19c75b4a1b');
-        const data = await response.json();
+        const response = await fetch('https://hq.sinajs.cn/?list=HF_XAUUSD');
+        const text = await response.text();
+        console.log('📦 新浪返回:', text);
         
-        // 解析数据（简化版本）
-        if (data && data.data) {
-          // 实际解析逻辑
-          console.log('API 返回:', data);
+        const match = text.match(/"([^"]+)"/);
+        if (match && match[1]) {
+          const parts = match[1].split(',');
+          const current = parseFloat(parts[0]);
+          const open = parseFloat(parts[1]) || current;
+          if (current > 0) {
+            const change = ((current - open) / open * 100);
+            console.log('✅ 金价:', current, '涨跌:', change.toFixed(2) + '%');
+            return { price: current, change: change };
+          }
         }
       } catch (e) {
-        console.log('API 调用失败，使用备用数据');
+        console.log('❌ 新浪 API 失败:', e.message);
       }
       
-      // 返回默认数据
-      return { price: currentGoldPrice, change: currentChange };
+      // 方案 2：备用数据（上次成功获取的值）
+      console.log('⚠️ 使用备用数据');
+      return { price: 4686.00, change: 1.25 };
     }
 
     // 加载数据
@@ -289,7 +295,7 @@
             <span class="price-unit">/盎司</span>
           </div>
           <div class="price-change ${changeClass}">
-            ${changeSymbol} ${data.change.toFixed(2)}%
+            ${changeSymbol} ${Math.abs(data.change).toFixed(2)}%
           </div>
         </div>
 
@@ -310,35 +316,35 @@
               <span class="price-brand">周大福</span>
               <div class="price-info">
                 <span class="price-num">¥${basePrice + 15}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${data.change.toFixed(0)}</span>
+                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">老凤祥</span>
               <div class="price-info">
                 <span class="price-num">¥${basePrice + 12}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${data.change.toFixed(0)}</span>
+                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">周生生</span>
               <div class="price-info">
                 <span class="price-num">¥${basePrice + 18}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${data.change.toFixed(0)}</span>
+                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">六福</span>
               <div class="price-info">
                 <span class="price-num">¥${basePrice + 14}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${data.change.toFixed(0)}</span>
+                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">中国黄金</span>
               <div class="price-info">
                 <span class="price-num">¥${basePrice + 8}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${data.change.toFixed(0)}</span>
+                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
               </div>
             </div>
           </div>
