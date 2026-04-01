@@ -232,50 +232,75 @@
   </div>
 
   <script>
-    // 获取实时金价 - 使用多个 CORS 代理
+    // 获取实时金价 - 分别获取国际和国内价格
     async function fetchGoldPrice() {
       console.log('🔄 开始获取金价...');
       
-      const apiUrl = 'https://hq.sinajs.cn/?list=HF_XAUUSD';
+      // 1. 国际金价（美元/盎司）
+      const internationalApi = 'https://hq.sinajs.cn/?list=HF_XAUUSD';
+      let internationalPrice = 4719.70;
+      let internationalChange = 0.72;
       
-      // 尝试多个代理
+      // 2. 上海黄金交易所 Au99.99（人民币/克）- 使用黄金 ETF 518880
+      const sgeApi = 'https://hq.sinajs.cn/?list=s_sh518880';
+      let sgePrice = 688.50;
+      let sgeChange = 0.85;
+      
       const proxies = [
         'https://api.allorigins.win/raw?url=',
-        'https://corsproxy.io/?',
-        'https://cors-anywhere.herokuapp.com/'
+        'https://corsproxy.io/?'
       ];
       
+      // 尝试获取国际金价
       for (const proxy of proxies) {
         try {
-          console.log('尝试代理:', proxy);
-          const proxyUrl = proxy + encodeURIComponent(apiUrl);
-          const response = await fetch(proxyUrl, {
-            headers: {
-              'X-Requested-With': 'XMLHttpRequest'
-            }
-          });
+          const proxyUrl = proxy + encodeURIComponent(internationalApi);
+          const response = await fetch(proxyUrl);
           const text = await response.text();
-          console.log('📦 返回:', text);
-          
           const match = text.match(/"([^"]+)"/);
           if (match && match[1]) {
             const parts = match[1].split(',');
             const current = parseFloat(parts[0]);
             const open = parseFloat(parts[1]) || current;
-            if (current > 0 && current > 1000) { // 验证数据合理性
-              const change = ((current - open) / open * 100);
-              console.log('✅ 金价:', current, '涨跌:', change.toFixed(2) + '%');
-              return { price: current, change: change };
+            if (current > 0 && current > 1000) {
+              internationalPrice = current;
+              internationalChange = ((current - open) / open * 100);
+              console.log('✅ 国际金价:', internationalPrice, '涨跌:', internationalChange.toFixed(2) + '%');
+              break;
             }
           }
         } catch (e) {
-          console.log('❌ 代理失败:', proxy, e.message);
+          console.log('❌ 国际金价获取失败');
         }
       }
       
-      // 备用数据
-      console.log('⚠️ 使用备用数据');
-      return { price: 4719.70, change: 0.72 };
+      // 尝试获取上海金价
+      for (const proxy of proxies) {
+        try {
+          const proxyUrl = proxy + encodeURIComponent(sgeApi);
+          const response = await fetch(proxyUrl);
+          const text = await response.text();
+          const match = text.match(/"([^"]+)"/);
+          if (match && match[1]) {
+            const parts = match[1].split(',');
+            const current = parseFloat(parts[3] || parts[0]);
+            const open = parseFloat(parts[1]) || current;
+            if (current > 0 && current > 100) {
+              sgePrice = current;
+              sgeChange = ((current - open) / open * 100);
+              console.log('✅ 上海金价:', sgePrice, '涨跌:', sgeChange.toFixed(2) + '%');
+              break;
+            }
+          }
+        } catch (e) {
+          console.log('❌ 上海金价获取失败');
+        }
+      }
+      
+      return {
+        international: { price: internationalPrice, change: internationalChange },
+        sge: { price: sgePrice, change: sgeChange }
+      };
     }
 
     // 加载数据
@@ -290,37 +315,38 @@
 
       const data = await fetchGoldPrice();
       
-      const usdToCny = 7.23;
-      const ounceToGram = 31.1035;
-      const cnyPerGram = (data.price * usdToCny / ounceToGram).toFixed(2);
-      const basePrice = Math.round(parseFloat(cnyPerGram));
-
       const now = new Date();
       const timeStr = `${now.getMonth() + 1}/${now.getDate()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       document.getElementById('updateTime').textContent = `更新时间：${timeStr}`;
 
-      const changeClass = data.change >= 0 ? 'up' : 'down';
-      const changeSymbol = data.change >= 0 ? '↑' : '↓';
+      const intlChangeClass = data.international.change >= 0 ? 'up' : 'down';
+      const intlChangeSymbol = data.international.change >= 0 ? '↑' : '↓';
+      
+      const sgeChangeClass = data.sge.change >= 0 ? 'up' : 'down';
+      const sgeChangeSymbol = data.sge.change >= 0 ? '↑' : '↓';
 
       content.innerHTML = `
         <div class="card">
           <div class="card-title">🌍 国际金价</div>
           <div class="card-subtitle">现货黄金</div>
           <div class="price-main">
-            <span class="price-value">$${data.price.toFixed(2)}</span>
+            <span class="price-value">$${data.international.price.toFixed(2)}</span>
             <span class="price-unit">/盎司</span>
           </div>
-          <div class="price-change ${changeClass}">
-            ${changeSymbol} ${Math.abs(data.change).toFixed(2)}%
+          <div class="price-change ${intlChangeClass}">
+            ${intlChangeSymbol} ${Math.abs(data.international.change).toFixed(2)}%
           </div>
         </div>
 
         <div class="card">
-          <div class="card-title">🇨🇳 人民币金价</div>
-          <div class="card-subtitle">换算价格</div>
+          <div class="card-title">🇨🇳 国内金价</div>
+          <div class="card-subtitle">上海黄金交易所 Au99.99</div>
           <div class="price-main">
-            <span class="price-value">¥${cnyPerGram}</span>
+            <span class="price-value">¥${data.sge.price.toFixed(2)}</span>
             <span class="price-unit">/克</span>
+          </div>
+          <div class="price-change ${sgeChangeClass}">
+            ${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(2)}%
           </div>
         </div>
 
@@ -331,36 +357,36 @@
             <div class="price-item">
               <span class="price-brand">周大福</span>
               <div class="price-info">
-                <span class="price-num">¥${basePrice + 15}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
+                <span class="price-num">¥${(data.sge.price + 15).toFixed(0)}/克</span>
+                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">老凤祥</span>
               <div class="price-info">
-                <span class="price-num">¥${basePrice + 12}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
+                <span class="price-num">¥${(data.sge.price + 12).toFixed(0)}/克</span>
+                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">周生生</span>
               <div class="price-info">
-                <span class="price-num">¥${basePrice + 18}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
+                <span class="price-num">¥${(data.sge.price + 18).toFixed(0)}/克</span>
+                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">六福</span>
               <div class="price-info">
-                <span class="price-num">¥${basePrice + 14}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
+                <span class="price-num">¥${(data.sge.price + 14).toFixed(0)}/克</span>
+                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
               </div>
             </div>
             <div class="price-item">
               <span class="price-brand">中国黄金</span>
               <div class="price-info">
-                <span class="price-num">¥${basePrice + 8}/克</span>
-                <span class="price-change-small ${changeClass}">${changeSymbol} ${Math.abs(data.change).toFixed(0)}</span>
+                <span class="price-num">¥${(data.sge.price + 8).toFixed(0)}/克</span>
+                <span class="price-change-small ${sgeChangeClass}">${sgeChangeSymbol} ${Math.abs(data.sge.change).toFixed(0)}</span>
               </div>
             </div>
           </div>
