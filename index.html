@@ -231,21 +231,25 @@
       let cpi = 3.2;
       
       try {
-        // 获取国际金价
-        const response = await fetch('https://api.gold-api.com/price/XAU');
+        // 获取国际金价 - 添加缓存避免跨域问题
+        const cacheBuster = '?t=' + Date.now();
+        const response = await fetch('https://api.gold-api.com/price/XAU' + cacheBuster);
         const data = await response.json();
-        if (data && data.price) {
+        if (data && data.price && data.price > 1000) {
           goldPrice = data.price;
           console.log('✅ 金价:', goldPrice);
+        } else {
+          console.log('❌ API 返回异常:', data);
         }
         
         // 国内金价 = 国际金价 × 汇率 ÷ 31.1035
         const exchangeRate = 7.23;
         const ounceToGram = 31.1035;
         domesticPrice = (goldPrice * exchangeRate / ounceToGram).toFixed(2);
+        console.log('✅ 国内金价:', domesticPrice);
         
       } catch (e) {
-        console.log('⚠️ API 失败，使用备用数据');
+        console.log('⚠️ API 失败:', e.message);
       }
       
       return {
